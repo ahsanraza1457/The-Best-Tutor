@@ -1,0 +1,126 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+}
+
+model AdmissionApplication {
+  id              String   @id @default(cuid())
+  referenceNumber String   @unique
+  studentName     String
+  fatherName      String
+  class           String
+  courseId        String?
+  city            String
+  area            String
+  phone           String
+  whatsapp        String
+  email           String
+  previousSchool  String?
+  message         String?
+  status          String   @default("New") // New, Contacted, Approved, Rejected
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  course          Course?  @relation(fields: [courseId], references: [id])
+}
+
+model Course {
+  id             String   @id @default(cuid())
+  name           String
+  class          String
+  description    String
+  subjects       String
+  teacherId      String?
+  fee            Float
+  duration       String
+  days           String
+  startTime      String
+  endTime        String
+  maxStudents    Int
+  status         String   @default("Active") // Active, Inactive
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  teacher        Teacher? @relation(fields: [teacherId], references: [id])
+  applications   AdmissionApplication[]
+  timetables     Timetable[]
+}
+
+model Teacher {
+  id            String   @id @default(cuid())
+  name          String
+  profileImage  String?
+  qualification String
+  subjects      String
+  experience    String
+  bio           String
+  phone         String
+  status        String   @default("Active") // Active, Inactive
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  courses       Course[]
+  timetables    Timetable[]
+}
+
+model Timetable {
+  id        String   @id @default(cuid())
+  day       String
+  startTime String
+  endTime   String
+  class     String
+  subject   String
+  room      String
+  courseId  String?
+  teacherId String?
+
+  course    Course?  @relation(fields: [courseId], references: [id])
+  teacher   Teacher? @relation(fields: [teacherId], references: [id])
+}
+
+model Testimonial {
+  id           String   @id @default(cuid())
+  name         String
+  studentClass String
+  text         String
+  rating       Int
+  status       String   @default("Active") // Active, Inactive
+  createdAt    DateTime @default(now())
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  email     String
+  message   String
+  createdAt DateTime @default(now())
+}
+
+model WebsiteSettings {
+  id            String @id @default(cuid())
+  instituteName String @default("The Best Tutor")
+  phone         String @default("")
+  whatsapp      String @default("")
+  email         String @default("")
+  address       String @default("")
+  city          String @default("")
+  aboutText     String @default("")
+  mission       String @default("")
+  vision        String @default("")
+}
