@@ -1,0 +1,316 @@
+{
+  "name": "Automated AI SEO Article & Image Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-content-csv",
+        "responseMode": "lastNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "10000000-0000-0000-0000-000000000001",
+      "name": "1. Upload CSV (Webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "ai-content-csv",
+      "notesInFlow": true,
+      "notes": "POST multipart/form-data with a file field named 'data'."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Webhook CSV receiver & Robust CSV Parser\nconst item = $input.first();\nconst binary = item.binary || {};\n\nlet binaryProperty = null;\nif (binary.data) {\n  binaryProperty = 'data';\n} else {\n  const keys = Object.keys(binary);\n  if (keys.length) binaryProperty = keys[0];\n}\n\nif (!binaryProperty) {\n  throw new Error('No CSV file received by the webhook. In Postman/cURL, use Body -> form-data with key \"data\" set to Type=File.');\n}\n\nconst buf = await this.helpers.getBinaryDataBuffer(0, binaryProperty);\nif (!buf || !buf.length) {\n  throw new Error(`Received an empty file in binary property \"${binaryProperty}\".`);\n}\n\nconst text = buf.toString('utf8').replace(/^\\uFEFF/, '').trim();\nif (!text) throw new Error('The uploaded CSV file is empty.');\n\nfunction parseCSV(text) {\n  const rows = [];\n  let row = [];\n  let cell = '';\n  let quoted = false;\n\n  for (let i = 0; i < text.length; i++) {\n    const c = text[i];\n    const next = text[i + 1];\n\n    if (c === '\"') {\n      if (quoted && next === '\"') {\n        cell += '\"';\n        i++;\n      } else {\n        quoted = !quoted;\n      }\n    } else if (c === ',' && !quoted) {\n      row.push(cell);\n      cell = '';\n    } else if ((c === '\\n' || c === '\\r') && !quoted) {\n      if (c === '\\r' && next === '\\n') i++;\n      row.push(cell);\n      cell = '';\n      if (row.some(v => String(v).trim() !== '')) rows.push(row);\n      row = [];\n    } else {\n      cell += c;\n    }\n  }\n  if (cell.length || row.length) {\n    row.push(cell);\n    if (row.some(v => String(v).trim() !== '')) rows.push(row);\n  }\n  return rows;\n}\n\nconst rows = parseCSV(text);\nif (rows.length < 2) {\n  throw new Error('CSV must contain a header row and at least one article title.');\n}\n\nconst headers = rows[0].map(h => String(h).trim().toLowerCase());\nlet titleIndex = headers.findIndex(h => ['title', 'article title', 'article_title', 'headline'].includes(h));\nif (titleIndex === -1) titleIndex = 0;\n\nconst output = [];\nfor (let r = 1; r < rows.length; r++) {\n  const title = String(rows[r][titleIndex] ?? '').trim();\n  if (!title) continue;\n\n  output.push({\n    json: {\n      articleId: `article-${r}-${Date.now()}`,\n      title,\n      sourceRow: r + 1,\n      sourceFile: item.binary?.[binaryProperty]?.fileName || 'uploaded.csv',\n      status: 'queued'\n    }\n  });\n}\n\nif (!output.length) {\n  throw new Error(`No article titles found in column \"${rows[0][titleIndex] || 'first column'}\".`);\n}\n\nreturn output;"
+      },
+      "id": "10000000-0000-0000-0000-000000000002",
+      "name": "2. Parse CSV",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "10000000-0000-0000-0000-000000000003",
+      "name": "3. Process Articles One by One",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.OPENAI_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{\nJSON.stringify({\n  model: \"gpt-4o\",\n  response_format: { type: \"json_object\" },\n  messages: [\n    {\n      role: \"system\",\n      content: \"You are an expert SEO content creator and editor. Return ONLY valid JSON matching the specified schema. Create a comprehensive, publication-ready article based on the supplied title.\\n\\nRules:\\n1. Section Count: If the title contains a number N (e.g. '10 Best Haircuts...'), create EXACTLY N sections. If no number is present, create EXACTLY 8 sections.\\n2. Sentence Length: Every section description MUST contain EXACTLY 5 to 6 complete sentences.\\n3. Do not count Introduction or Conclusion as sections.\\n4. Output schema format: { \\\"title\\\": \\\"...\\\", \\\"introduction\\\": \\\"...\\\", \\\"sections\\\": [ { \\\"number\\\": 1, \\\"heading\\\": \\\"...\\\", \\\"description\\\": \\\"...\\\", \\\"image_prompt\\\": \\\"...\\\" } ], \\\"conclusion\\\": \\\"...\\\" }\"\n    },\n    {\n      role: \"user\",\n      content: \"Article title: \" + $json.title\n    }\n  ],\n  temperature: 0.7\n})\n}}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "10000000-0000-0000-0000-000000000004",
+      "name": "4. Generate Article with GPT-4o",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Requires OPENAI_API_KEY environment variable or n8n Credential."
+    },
+    {
+      "parameters": {
+        "jsCode": "const responseText = $json.choices?.[0]?.message?.content || '';\nif (!responseText) throw new Error(`No text returned by OpenAI for \"${$json.title}\".`);\n\nconst cleaned = responseText.trim().replace(/^```json\\s*/i, '').replace(/\\s*```$/, '');\nlet article;\ntry {\n  article = JSON.parse(cleaned);\n} catch (e) {\n  throw new Error(`Invalid JSON from GPT-4o for \"${$json.title}\": ${e.message}`);\n}\n\nconst nMatch = String($json.title).match(/\\b(\\d{1,3})\\b/);\nconst expectedSections = nMatch ? parseInt(nMatch[1], 10) : 8;\n\nif (!Array.isArray(article.sections) || article.sections.length !== expectedSections) {\n  throw new Error(`Section count mismatch for \"${$json.title}\". Expected ${expectedSections}, got ${article.sections?.length || 0}.`);\n}\n\nfor (let i = 0; i < article.sections.length; i++) {\n  const s = article.sections[i];\n  if (!s.heading || !s.description || !s.image_prompt) {\n    throw new Error(`Section ${i + 1} is missing heading, description, or image_prompt.`);\n  }\n  const sentences = String(s.description).split(/(?<=[.!?])\\s+/).filter(Boolean);\n  if (sentences.length < 5 || sentences.length > 6) {\n    throw new Error(`Section ${i + 1} must contain 5-6 sentences; got ${sentences.length}.`);\n  }\n  s.number = i + 1;\n}\n\nreturn [{\n  json: {\n    articleId: $json.articleId,\n    title: article.title || $json.title,\n    introduction: article.introduction || '',\n    conclusion: article.conclusion || '',\n    sections: article.sections,\n    expectedSections: expectedSections,\n    status: 'article_generated'\n  }\n}];"
+      },
+      "id": "10000000-0000-0000-0000-000000000005",
+      "name": "5. Validate Exact Section & Sentence Count",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const outputs = [];\nconst faceProfiles = [\n  \"A distinct adult woman with an oval face, warm olive complexion, and gentle brown eyes\",\n  \"A distinct adult woman with a heart-shaped face, soft freckles, and green eyes\",\n  \"A distinct adult woman with a square jawline, warm golden complexion, and hazel eyes\",\n  \"A distinct adult woman with a round face, fair complexion, and expressive blue eyes\",\n  \"A distinct adult woman with high cheekbones, diamond face shape, and deep dark eyes\",\n  \"A distinct adult woman with a long face shape, subtle beauty mark, and amber eyes\",\n  \"A distinct adult woman with soft arched eyebrows, natural complexion, and light brown eyes\",\n  \"A distinct adult woman with an oval face, rich bronze complexion, and dark eyes\",\n  \"A distinct adult woman with a heart-shaped face, rosy cheeks, and bright blue eyes\",\n  \"A distinct adult woman with a square face shape, soft features, and hazel green eyes\",\n  \"A distinct adult woman with a round face, sun-kissed skin tone, and warm brown eyes\",\n  \"A distinct adult woman with high cheekbones, elegant features, and dark grey eyes\"\n];\n\nfor (const item of $input.all()) {\n  const a = item.json;\n  for (let i = 0; i < a.sections.length; i++) {\n    const s = a.sections[i];\n    const faceIdentity = faceProfiles[i % faceProfiles.length] + `; unique face variant ${i + 1} for this article`;\n    outputs.push({\n      json: {\n        articleId: a.articleId,\n        title: a.title,\n        introduction: a.introduction,\n        conclusion: a.conclusion,\n        expectedSections: a.expectedSections,\n        sectionNumber: i + 1,\n        sectionTitle: s.heading,\n        description: s.description,\n        baseImagePrompt: s.image_prompt,\n        faceIdentity: faceIdentity\n      }\n    });\n  }\n}\nreturn outputs;"
+      },
+      "id": "10000000-0000-0000-0000-000000000006",
+      "name": "6. Expand Sections & Assign Unique Faces",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "10000000-0000-0000-0000-000000000007",
+      "name": "7. Generate Images One by One",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/generations",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.OPENAI_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{\nJSON.stringify({\n  model: \"dall-e-3\",\n  prompt: \"Professional high quality editorial photograph for a web article. Subject haircut: \" + $json.sectionTitle + \". Visual style: \" + $json.baseImagePrompt + \". Model facial structure: \" + $json.faceIdentity + \". Show the haircut clearly from front or side angle, realistic hair texture, natural studio lighting, clean background, single person only, no text, no logos, photorealistic.\",\n  n: 1,\n  size: \"1024x1024\",\n  quality: \"standard\",\n  response_format: \"b64_json\"\n})\n}}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "id": "10000000-0000-0000-0000-000000000008",
+      "name": "8. Generate Image with DALL-E 3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Requires OPENAI_API_KEY environment variable or n8n Credential."
+    },
+    {
+      "parameters": {
+        "jsCode": "const imgRes = $json.data?.[0];\nconst b64 = imgRes?.b64_json;\nconst url = imgRes?.url;\n\nlet imageDataUri = '';\nif (b64) {\n  imageDataUri = `data:image/png;base64,${b64}`;\n} else if (url) {\n  imageDataUri = url;\n} else {\n  throw new Error(`DALL-E 3 failed for article ${$json.articleId}, section ${$json.sectionNumber}. No image data returned.`);\n}\n\nreturn [{\n  json: {\n    articleId: $json.articleId,\n    title: $json.title,\n    introduction: $json.introduction,\n    conclusion: $json.conclusion,\n    expectedSections: $json.expectedSections,\n    sectionNumber: $json.sectionNumber,\n    sectionTitle: $json.sectionTitle,\n    description: $json.description,\n    imageDataUri: imageDataUri,\n    status: 'image_generated'\n  }\n}];"
+      },
+      "id": "10000000-0000-0000-0000-000000000009",
+      "name": "9. Keep Image + Section Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const groups = new Map();\nfor (const item of $input.all()) {\n  const j = item.json;\n  if (!groups.has(j.articleId)) groups.set(j.articleId, []);\n  groups.get(j.articleId).push(j);\n}\n\nconst results = [];\nfor (const [articleId, sections] of groups) {\n  sections.sort((a, b) => a.sectionNumber - b.sectionNumber);\n  const title = sections[0].title;\n  const intro = sections[0].introduction;\n  const conclusion = sections[0].conclusion;\n  \n  const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\n  \n  // Generate WordPress / Blogger HTML\n  let html = `<article class=\"ai-seo-article\">\\n<h1>${esc(title)}</h1>\\n\\n<p class=\"intro\">${esc(intro)}</p>\\n\\n`;\n  for (const s of sections) {\n    html += `<h2>${s.sectionNumber}. ${esc(s.sectionTitle)}</h2>\\n`;\n    html += `<figure><img src=\"${s.imageDataUri}\" alt=\"${esc(s.sectionTitle)}\" loading=\"lazy\" style=\"max-width:100%;height:auto;border-radius:8px;\" /></figure>\\n`;\n    html += `<p>${esc(s.description)}</p>\\n\\n`;\n  }\n  html += `<h2>Conclusion</h2>\\n<p class=\"conclusion\">${esc(conclusion)}</p>\\n</article>`;\n  \n  // Generate Markdown\n  let markdown = `# ${title}\\n\\n${intro}\\n\\n`;\n  markdown += sections.map(s => `## ${s.sectionNumber}. ${s.sectionTitle}\\n\\n![${s.sectionTitle}](${s.imageDataUri})\\n\\n${s.description}`).join('\\n\\n');\n  markdown += `\\n\\n## Conclusion\\n\\n${conclusion}`;\n  \n  results.push({\n    json: {\n      success: true,\n      articleId,\n      title,\n      totalSections: sections.length,\n      htmlOutput: html,\n      markdownOutput: markdown,\n      publishingReady: {\n        wordpressFormat: html,\n        bloggerFormat: html,\n        markdownFormat: markdown\n      }\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "10000000-0000-0000-0000-000000000010",
+      "name": "10. Compile WordPress & Blogger Ready Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "1. Upload CSV (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "2. Parse CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Parse CSV": {
+      "main": [
+        [
+          {
+            "node": "3. Process Articles One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Process Articles One by One": {
+      "main": [
+        [
+          {
+            "node": "4. Generate Article with GPT-4o",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6. Expand Sections & Assign Unique Faces",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Generate Article with GPT-4o": {
+      "main": [
+        [
+          {
+            "node": "5. Validate Exact Section & Sentence Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Validate Exact Section & Sentence Count": {
+      "main": [
+        [
+          {
+            "node": "3. Process Articles One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Expand Sections & Assign Unique Faces": {
+      "main": [
+        [
+          {
+            "node": "7. Generate Images One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7. Generate Images One by One": {
+      "main": [
+        [
+          {
+            "node": "8. Generate Image with DALL-E 3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "10. Compile WordPress & Blogger Ready Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8. Generate Image with DALL-E 3": {
+      "main": [
+        [
+          {
+            "node": "9. Keep Image + Section Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "9. Keep Image + Section Data": {
+      "main": [
+        [
+          {
+            "node": "7. Generate Images One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "10000000-0000-0000-0000-000000000099",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

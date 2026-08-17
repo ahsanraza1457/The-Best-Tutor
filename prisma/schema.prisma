@@ -24,6 +24,8 @@ model AdmissionApplication {
   studentName     String
   fatherName      String
   class           String
+  subjects        String?  // Selected subject(s) e.g., Math, Physics, Computer
+  tuitionMode     String   @default("Home Tuition") // Home Tuition, Online Tuition, Both
   courseId        String?
   city            String
   area            String

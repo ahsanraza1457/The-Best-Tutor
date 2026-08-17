@@ -1,0 +1,90 @@
+.banner {
+  background-color: var(--primary-color);
+  color: var(--bg-white);
+  padding: 5rem 0;
+  text-align: center;
+}
+
+.bannerTitle {
+  color: var(--bg-white);
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.bannerSubtitle {
+  font-size: 1.2rem;
+  opacity: 0.9;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.coursesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 2rem;
+}
+
+.courseHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.courseClass {
+  background-color: rgba(43, 108, 176, 0.1);
+  color: var(--primary-color);
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.courseFee {
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--text-dark);
+}
+
+.courseTitle {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.courseDesc {
+  color: var(--text-light);
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+
+.courseDetails {
+  background-color: var(--bg-light);
+  padding: 1.25rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1.5rem;
+}
+
+.detailItem {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.detailItem:last-child {
+  margin-bottom: 0;
+}
+
+.detailItem strong {
+  color: var(--primary-color);
+}
+
+.courseActions {
+  margin-top: auto;
+}
+
+@media (max-width: 768px) {
+  .coursesGrid {
+    grid-template-columns: 1fr;
+  }
+}

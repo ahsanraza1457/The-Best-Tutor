@@ -1,0 +1,169 @@
+.banner {
+  background-color: var(--primary-color);
+  color: var(--bg-white);
+  padding: 5rem 0;
+  text-align: center;
+}
+
+.bannerTitle {
+  color: var(--bg-white);
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.bannerSubtitle {
+  font-size: 1.2rem;
+  opacity: 0.9;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.admissionsLayout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 3rem;
+}
+
+.infoSidebar {
+  position: sticky;
+  top: 100px;
+  align-self: start;
+}
+
+.benefitList {
+  list-style: none;
+  padding: 0;
+}
+
+.benefitList li {
+  margin-bottom: 0.75rem;
+  color: var(--text-dark);
+  font-size: 0.95rem;
+}
+
+.formGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.formSection {
+  background-color: var(--bg-white);
+}
+
+.sectionTitle {
+  font-size: 1.25rem;
+  color: var(--primary-color);
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--bg-light);
+}
+
+.rowGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.checkboxGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  background-color: var(--bg-slate);
+  padding: 1.25rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+}
+
+.subjectBox {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--text-dark);
+  cursor: pointer;
+  background: #ffffff;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.subjectBox:hover {
+  border-color: var(--emerald-accent);
+  background-color: rgba(5, 150, 105, 0.04);
+}
+
+.consentSection {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background-color: var(--bg-slate);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: var(--text-dark);
+}
+
+.checkbox {
+  margin-top: 0.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.errorMessage {
+  padding: 1rem;
+  background-color: rgba(245, 101, 101, 0.1);
+  border: 1px solid var(--error-color);
+  color: var(--error-color);
+  border-radius: var(--radius-md);
+  margin-bottom: 1.5rem;
+}
+
+.successIcon {
+  width: 80px;
+  height: 80px;
+  background-color: var(--success-color);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin: 0 auto 1.5rem auto;
+}
+
+.referenceBox {
+  background-color: var(--bg-light);
+  padding: 1.5rem;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-color);
+  display: inline-block;
+  min-width: 250px;
+  font-size: 1.5rem;
+  color: var(--primary-color);
+}
+
+@media (max-width: 992px) {
+  .admissionsLayout {
+    grid-template-columns: 1fr;
+  }
+  
+  .infoSidebar {
+    position: static;
+  }
+}
+
+@media (max-width: 768px) {
+  .rowGrid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
